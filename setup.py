@@ -27,6 +27,7 @@ from distutils.util     import convert_path
 min_numpy_version = '1.4.1'
 min_numexpr_version = '1.4.1'
 min_cython_version = '0.13'
+min_blosc_version = '1.0.0'
 
 # Some functions for showing errors and warnings.
 def _print_admonition(kind, head, body):
@@ -67,6 +68,7 @@ def check_import(pkgname, pkgver):
     globals()[pkgname] = mod
 
 check_import('numpy', min_numpy_version)
+check_import('blosc', min_blosc_version)
 # Check for numexpr only if not using setuptools (see #298)
 if not has_setuptools:
     check_import('numexpr', min_numexpr_version)
@@ -302,6 +304,7 @@ if os.name == 'posix':
         'LZO2': ['lzo2'],
         'LZO': ['lzo'],
         'BZ2': ['bz2'],
+        'BLOSC': ['blosc'],
         }
 elif os.name == 'nt':
     _Package = WindowsPackage
@@ -310,6 +313,7 @@ elif os.name == 'nt':
         'LZO2': ['lzo2', 'lzo2'],
         'LZO': ['liblzo', 'lzo1'],
         'BZ2': ['bzip2', 'bzip2'],
+        'BLOSC': ['blosc', 'blosc'],
         }
     # Copy the next DLL's to binaries by default.
     # Update these paths for your own system!
@@ -323,7 +327,7 @@ hdf5_package = _Package("HDF5", 'HDF5', 'H5public', *_platdep['HDF5'])
 lzo2_package = _Package("LZO 2", 'LZO2', _cp('lzo/lzo1x'), *_platdep['LZO2'])
 lzo1_package = _Package("LZO 1", 'LZO', 'lzo1x', *_platdep['LZO'])
 bzip2_package = _Package("bzip2", 'BZ2', 'bzlib', *_platdep['BZ2'])
-
+blosc_package = _Package("blosc", 'BLOSC', 'blosc', *_platdep['BLOSC'])
 
 #-----------------------------------------------------------------
 
@@ -339,6 +343,7 @@ if os.name == 'nt':
 HDF5_DIR = os.environ.get('HDF5_DIR', '')
 LZO_DIR = os.environ.get('LZO_DIR', '')
 BZIP2_DIR = os.environ.get('BZIP2_DIR', '')
+BLOSC_DIR = os.environ.get('BLOSC_DIR', '')
 LFLAGS = os.environ.get('LFLAGS', '').split()
 # in GCC-style compilers, -w in extra flags will get rid of copious
 # 'uninitialized variable' Cython warnings. However, this shouldn't be
@@ -360,6 +365,9 @@ for arg in args:
         sys.argv.remove(arg)
     elif arg.find('--bzip2=') == 0:
         BZIP2_DIR = expanduser(arg.split('=')[1])
+        sys.argv.remove(arg)
+    elif arg.find('--blosc=') == 0:
+        BLOSC_DIR = expanduser(arg.split('=')[1])
         sys.argv.remove(arg)
     elif arg.find('--lflags=') == 0:
         LFLAGS = arg.split('=')[1].split()
@@ -388,6 +396,7 @@ for (package, location) in [
     (lzo2_package, LZO_DIR),
     (lzo1_package, LZO_DIR),
     (bzip2_package, BZIP2_DIR),
+    (blosc_package, BLOSC_DIR),
     ]:
 
     if package.tag == 'LZO' and lzo2_enabled:
@@ -523,10 +532,11 @@ if has_setuptools:
     setuptools_kwargs['zip_safe'] = False
 
     # ``NumPy`` headers are needed for building the extensions, as
-    # well as Cython.
+    # well as Cython and Blosc.
     setuptools_kwargs['setup_requires'] = [
         'numpy>=%s' % min_numpy_version,
         'cython>=%s' % min_cython_version,
+        'blosc>=%s' % min_blosc_version,
         ]
     # ``NumPy`` and ``Numexpr`` are absolutely required for running PyTables.
     setuptools_kwargs['install_requires'] = [
@@ -537,6 +547,7 @@ if has_setuptools:
         'Numeric': ['Numeric>=24.2'],  # for ``Numeric`` support
         'netCDF': ['ScientificPython'],  # for netCDF interchange
         'numarray': ['numarray>=1.5.2'],  # for ``numarray`` support
+        'blosc':['blosc>=1.0'], # for ``blosc`` support
         }
 
     # Detect packages automatically.
@@ -593,7 +604,7 @@ if os.name == "nt":
     data_files.extend([('Lib/site-packages/%s'%name, dll_files),
                        ])
 
-ADDLIBS = [hdf5_package.library_name, ]
+ADDLIBS = [hdf5_package.library_name, blosc_package.library_name]
 utilsExtension_libs = LIBS + ADDLIBS
 hdf5Extension_libs = LIBS + ADDLIBS
 tableExtension_libs = LIBS + ADDLIBS
@@ -612,8 +623,7 @@ for (package, complibs) in [
         complibs.extend([hdf5_package.library_name, package.library_name])
 
 # List of Blosc file dependencies
-blosc_files = ["blosc/blosc.c", "blosc/blosclz.c", "blosc/shuffle.c",
-               "blosc/blosc_filter.c"]
+blosc_files = ['blosc/blosc_filter.c']
 
 extensions = [
     Extension( "tables.utilsExtension",

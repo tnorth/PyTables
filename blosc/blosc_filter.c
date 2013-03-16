@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <blosc.h>
 #include "hdf5.h"
-#include "../blosc/blosc.h"
 #include "blosc_filter.h"
 
 
